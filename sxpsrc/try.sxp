@@ -1,0 +1,21 @@
+(defn foo
+  []
+  (try
+    (try
+      (/ 1 0)
+      (catch SxArithmeticError e
+        (println "foo got SxArithmeticError")
+        (let [s (fstream "foo.txt" :in)]
+          s))
+      (catch SxError e
+        (println "foo got SxArithmeticError"))
+      (finally
+        (println "foo 2nd try finally")))
+    (catch SxIOError e
+      (throw e)
+      ;; (println "foo got SxIOError")
+      )
+    (catch SxError e
+      (println "foo got 1st SxError"))
+    (finally
+      (println "foo 1st finally"))))

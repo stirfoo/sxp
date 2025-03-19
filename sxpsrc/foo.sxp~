@@ -1,0 +1,64 @@
+(defn foo [n]
+  (let [out nil]
+    (dotimes [i n]
+      (loop [j 0 s nil]
+        (if (<= j i)
+          (recur (inc j) (cons j s))
+          (set! out (apply (fn [& xs] xs) s)))))
+    out))
+
+(defn bar []
+  (try
+    (cons 1 0 2)
+    (catch SxArithmeticError e          ;checking order of catches
+      :caught-SxArithmeticError)
+    (catch SxCastError e
+      :caught-SxCastError)
+    (catch SxRuntimeError e
+      :caught-SxRuntimeError)
+    (catch SxError e
+      :caught-SxError)))         ;this should not get call on 1/0
+
+
+(defn doit
+  []
+  (vm-trace)
+  (fn-dump bar)
+  (bar))
+
+
+(defn primes
+  "Find all the primes up to but not including n."
+  [n]
+  (reduce
+   (fn [primes number]
+     (if (some zero? (map (partial math/mod number)
+                          primes))
+       primes
+       (conj primes number)))
+   [2]
+   (next (nnext (range n)))))
+
+(defn fibonacci
+  "Works but will overflow because sexp doesn't have bignums."
+  [n]
+  (reduce
+   (fn [a b] (conj a (+ (last a) (last (butlast a)))))
+   [0 1]
+   (range n)))
+
+(defn test|->
+  "Extract a value from a nested map. "
+  []
+  (let [person
+        {:name "Mark Volkmann"
+         :address {:street "644 Glen Summit"
+                   :city "St. Charles"
+                   :state "Missouri"
+                   :zip 63304}
+         :employer {:name "Object Computing, Inc."
+                    :address {:street "12140 Woodcrest Dr."
+                              :city "Creve Coeur"
+                              :state "Missouri"
+                              :zip 63141}}}]
+    (-> person :employer :address :city)))

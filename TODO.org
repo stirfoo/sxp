@@ -1,0 +1,14 @@
+* [1/1] Constants
+  - [X] Constant symbols cannot be ns-qualified but quasiquote will qualify
+    them.
+* [1/1] Meta Data
+  - [X] defn and defmacro macros are not merging new meta data
+    : (defn #^{:private true} foo "docstring" [] ...)
+    In the previous form, foo will have the meta
+    : ~{:doc "docstring"} but not the :private key
+    Me thinks the problem is with-meta overwrites an object's existing meta
+    map.... Nope, it was in the definition of defn and defmacro.
+* [1/1] Destructure
+  - [ ] The destructure function depends on a hash-able hashmap. Clojure's
+    maps are immutable, so this works. Not so with sexp. SxHashmap is
+    currently hashed by its pointer /which is crap/ but it works for now.

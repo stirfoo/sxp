@@ -1,0 +1,20 @@
+(ns user)
+
+(defn repl
+  []
+  (let [eoi ()]
+    (loop []
+      (try
+        (print (str (ns-name *ns*) "> "))
+        (let [x (read *in* false eoi)]
+          (when-not (identical? x eoi)
+            (prn (eval x))
+            (recur)))
+        (catch SxError e
+          (println (str (typename e) ": " (err-msg e)))
+          ;; cin.ignore(numeric_limits::max(), '\n');
+          ;; clear the input for the next read
+          (while (not= (read-char *in*) \newline))
+          (recur))))))
+
+(repl)

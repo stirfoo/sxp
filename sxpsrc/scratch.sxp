@@ -1,0 +1,32 @@
+(defn bar []
+  (try
+    (cons 1 2)
+    (catch SxError e
+      (println "got bar SxError"))
+    (finally
+      (println "got bar finally"))))
+
+
+(defn foo []
+  (try
+    (/ 1 0)
+    :protected-code
+    (catch SxIOError e
+      :SxIOError-catch)
+    (catch SxArithmeticError e
+      (println "got foo SxArithmeticError")
+      (bar))
+    (catch SxError e
+      :SxError-catch)
+    (finally
+      (println "got foo finally"))))
+
+(defn testypoo
+  []
+  (binding [*in* (sstream "one\ntwo\nthree")]
+    (loop [s (read-line)]
+      (if s
+        (do
+          (println s)
+          (recur (read-line)))
+        :done!))))

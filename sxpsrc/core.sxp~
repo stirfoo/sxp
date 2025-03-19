@@ -1,0 +1,759 @@
+;;;
+;;;
+;;;
+
+(in-ns 'sexp)
+
+(def second
+  (fn second [coll]
+    (first (next coll))))
+
+(def string?
+  (fn string? [s]
+    (= (typename s) "SxString")))
+
+(def #^{:macro true
+        :doc "Same as (def foo (fn foo [] ...)). Return a function."}
+  defn
+  (fn defn [name & fn-spec]
+    (if (string? (first fn-spec))
+      `(def ~(with-meta name (assoc (meta name)
+                                    :doc (first fn-spec)))
+         (fn ~name ~(second fn-spec) ~@(rest (rest fn-spec))))
+      `(def ~name
+         (fn ~name ~(first fn-spec) ~@(rest fn-spec))))))
+
+(defn #^{:macro true} defmacro
+  [name & fn-spec]
+  (if (string? (first fn-spec))
+    `(def ~(with-meta name (assoc (meta name)
+                                  :macro true
+                                  :doc (first fn-spec)))
+       (fn ~name ~(second fn-spec) ~@(rest (rest fn-spec))))
+    `(def ~(with-meta name (assoc (meta name)
+                                  :macro true))
+       (fn ~name ~(first fn-spec) ~@(rest fn-spec)))))
+
+;;; It werks! woop woop!
+(defmacro comment
+  "Ignore the body, return nil."
+  [& body])
+
+;;; initial definition, will be redefined later with destructuring
+(defmacro let
+  [bindings & body]
+  `(let* ~bindings ~@body))
+
+(defmacro or
+  "Return the first logically true value, or nil if none are found. Return nil
+  if no args are given"
+  ([] nil)
+  ([x] x)
+  ([x & next]
+   `(let [or# ~x]
+      (if or# or# (or ~@next)))))
+
+(defmacro and
+  "Return the last argument if all are logically true. Return true if no args
+  are given"
+  ([] true)
+  ([x] x)
+  ([x & next]
+   `(let [and# ~x]
+      (if and# (and ~@next) and#))))
+
+(defn nil?
+  "Return true if x is nil."
+  [x]
+  (= x nil))
+
+(defn true?
+  "Return true if x is the sexp constant true."
+  [x]
+  (= x true))
+
+(defn false?
+  "Return true if x is the sexp constant false."
+  [x]
+  (= x false))
+
+(defn cons
+  "Return a new seq where x is first and a seq on coll is the rest."
+  [x coll]
+  (apply list x coll))
+
+(defn second
+  "Return the 2nd elemment in the seqable coll."
+  [coll]
+  (first (next coll)))
+
+(defn not
+  "Return true if x is boolean false, false otherwise"
+  [x]
+  (if x false true))
+
+(defn not=
+  "Return true if any two xs are not equal."
+  ([x] false)
+  ([x y] (not (= x y)))
+  ([x y & more] (not (apply = x y more))))
+
+(defn nnext
+  "Return the tail of the tail of the seq-able s, or nil."
+  [s]
+  (next (next s)))
+
+(defn third
+  "Return the 3rd element in the seq-able s or nil"
+  [s]
+  (first (nnext s)))
+
+(defn fourth
+  "Return the 4th element in the seq-able s or nil"
+  [s]
+  (first (next (nnext s))))
+
+(defn ffirst
+  "Return the first of the first of the seq-able s, or nil."
+  [s]
+  (first (first s)))
+
+(defn fnext
+  "Return the first of the next of the seq-able s, or nil."
+  [s]
+  (first (next s)))
+
+(defn last
+  "Return the last element of the seq-able s, or nil."
+  [s]
+  (if (next s)
+    (recur (next s))
+    (first s)))
+
+(defn butlast
+  "Return a new list of all the elments in s except the last."
+  [s]
+  (loop [ret []
+         s s]
+    (if (next s)
+      (recur (conj ret (first s)) (next s))
+      (seq ret))))
+
+(defn identity
+  "Return x."
+  [x]
+  x)
+
+(defn neg?
+  "Return true if the number x is < 0"
+  [x]
+  (< x 0))
+
+(defn pos?
+  "Return true if the number x is > 0"
+  [x]
+  (not (or (< x 0)
+           (== x 0))))
+
+(defn zero?
+  "Return true if the number x is == 0."
+  [x]
+  (== x 0))
+
+(defn inc
+  "Return x + 1"
+  [x]
+  (+ x 1))
+
+(defn dec
+  "Return x - 1"
+  [x]
+  (- x 1))
+
+(defn keys
+  "Return a seq of the map's keys."
+  [m]
+  (loop [ks nil
+         pairs (seq m)]
+    (if pairs
+      (recur (cons (ffirst pairs) ks)
+             (next pairs))
+      ks)))
+
+(defn vals
+  "Return a seq of the map's values."
+  [m]
+  (loop [vs nil
+         pairs (seq m)]
+    (if pairs
+      (recur (cons (fnext (first pairs)) vs)
+             (next pairs))
+      vs)))
+
+(defn >=
+  "Return true if each number, left-to-right, is >= the next."
+  ([x] true)
+  ([x y] (or (== x y) (not (< x y))))
+  ([x y & zs]
+   (if (>= x y)
+     (if (next zs)
+       (recur y (first zs) (next zs))
+       (>= y (first zs)))
+     false)))
+
+(defn >
+  "Return true if each number, left-to-right, is > the next."
+  ([x] true)
+  ([x y] (not (or (== x y) (< x y))))
+  ([x y & zs]
+   (if (> x y)
+     (if (next zs)
+       (recur y (first zs) (next zs))
+       (> y (first zs)))
+     false)))
+
+(defn <=
+  "Return true if each number, left-to-right, is <= the next."
+  ([x] true)
+  ([x y] (or (== x y) (< x y)))
+  ([x y & zs]
+   (if (<= x y)
+     (if (next zs)
+       (recur y (first zs) (next zs))
+       (<= y (first zs)))
+     false)))
+
+(defmacro when
+  "If test is true, evaluate body."
+  [test & body]
+  (list 'if test (cons 'do body)))
+
+(defmacro when-not
+  "If test is false, evaluate body."
+  [test & body]
+  (list 'if test nil (cons 'do body)))
+
+(defmacro while
+  "While test is logically true, eval body."
+  [test & body]
+  `(loop []
+     (when ~test
+       ~@body
+       (recur))))
+
+(defn complement
+  "Return a function that behaves as: (not (f ...))."
+  [f]
+  (fn
+    ([] (not (f)))
+    ([x] (not (f x)))
+    ([x y] (not (f x y)))
+    ([x y & zs] (not (apply f x y zs)))))
+
+(defn constantly
+  "Return a function that returns x regardless of the number of args passed to(
+  the function."
+  [x]
+  (fn [& xs] x))
+
+(defmacro ->
+  "Threads the expressions through the forms. Inserts x as the second item in
+  the first form, making a list of it if it is not a list already. If there
+  are more forms, inserts the first form as the second item in the second
+  form, etc."
+  ([x] x)
+  ([x form] (if (seq? form)
+              (with-meta `(~(first form) ~x ~@(next form)) (meta form))
+              (list form x)))
+  ([x form & more] `(-> (-> ~x ~form) ~@more)))
+
+(defn some
+  "Return the first logical true value of (PRED X) for any x in coll, else
+  nil."
+  [pred coll]
+  (when (seq coll)
+    (or (pred (first coll))
+        (recur pred (next coll)))))
+
+(defmacro dotimes
+  "Eval body with sym bound to the integers 0 to n-1. Return nil."
+  [bindings & body]
+  (let [i (bindings 0)
+        n (bindings 1)]
+    `(let [n# (int ~n)]
+       (loop [~i 0]
+         (when (< ~i n#)
+           ~@body
+           (recur (inc ~i)))))))
+
+(defn zipmap
+  "Return a map with keys mapped to corresponding vals."
+  [keys vals]
+  (loop [m {}
+         ks (seq keys)
+         vs (seq vals)]
+    (if (and ks vs)
+      (recur (assoc m (first ks) (first vs))
+             (next ks)
+             (next vs))
+      m)))
+
+(defn gensym
+  "Return a `unique' symbol using next sequential runtime id."
+  ([]
+   (gensym "G__"))
+  ([prefix-str]
+   (symbol (str prefix-str (next-id)))))
+
+(defmacro lazy-seq
+  [& body]
+  `(make-lazy-seq  (#^{:once true} fn ~(gensym "LAZY_THUNKER__") [] ~@body)))
+
+(defmacro when-let
+  [bindings & body]
+  (let [form (bindings 0) tst (bindings 1)]
+    `(let [temp# ~tst]
+       (when temp#
+         (let [~form temp#]
+           ~@body)))))
+
+;; (defn take
+;;   [n coll]
+;;   (lazy-seq
+;;    (when (pos? n)
+;;      (when-let [s (seq coll)]
+;;        (cons (first s) (take (dec n) (rest s)))))))
+
+(defn take
+  [n coll]
+  (when (pos? n)
+    (when-let [s (seq coll)]
+      (cons (first s) (take (dec n) (rest s))))))
+
+;; (defn take-while
+;;   [pred coll]
+;;   (lazy-seq
+;;    (when-let [s (seq coll)]
+;;      (when (pred (first s))
+;;        (cons (first s) (take-while pred (rest s)))))))
+
+(defn take-while
+  [pred coll]
+  (when-let [s (seq coll)]
+    (when (pred (first s))
+      (cons (first s) (take-while pred (rest s))))))
+
+(defn drop
+  [n coll]
+  (let [step (fn [n coll]
+               (let [s (seq coll)]
+                 (if (and (pos? n) s)
+                   (recur (dec n) (rest s))
+                   s)))]
+    (step n coll)))
+
+;; (defn drop
+;;   [n coll]
+;;   (let [step (fn [n coll]
+;;                (let [s (seq coll)]
+;;                  (if (and (pos? n) s)
+;;                    (recur (dec n) (rest s))
+;;                    s)))]
+;;     (lazy-seq (step n coll))))
+
+(defn take-last
+  [n coll]
+  (loop [s (seq coll)
+         lead (seq (drop n coll))]
+    (if lead
+      (recur (next s) (next lead))
+      s)))
+
+;; (defn drop-while
+;;   [pred coll]
+;;   (let [step (fn [pred coll]
+;;                (let [s (seq coll)]
+;;                  (if (and s (pred (first s)))
+;;                    (recur pred (rest s))
+;;                    s)))]
+;;     (lazy-seq (step pred coll))))
+
+(defn drop-while
+  [pred coll]
+  (let [step (fn [pred coll]
+               (let [s (seq coll)]
+                 (if (and s (pred (first s)))
+                   (recur pred (rest s))
+                   s)))]
+    (step pred coll)))
+
+(defn split-with
+  [pred coll]
+  [(take-while pred coll)
+   (drop-while pred coll)])
+
+(defn prn
+  "Same as pr but also print a trailing newline. Return nil."
+  ([& xs]
+   (apply pr xs)
+   (newline)))
+
+(defmacro binding
+  "Dynamically bind the vars in bindings to their associated vals. These vars
+  will be restored to their previous values at exit of the body. Return the
+  result of the body."
+  [bindings & body]
+  (let [var-ize (fn [var-vals]
+                  (loop [ret [] vvs (seq var-vals)]
+                    (if vvs
+                      (recur (conj (conj ret `(var ~(first vvs)))
+                                   (second vvs))
+                             (next (next vvs)))
+                      (seq ret))))]
+    `(let []
+       (push-bindings (hashmap ~@(var-ize bindings)))
+       (try
+         ~@body
+         (finally
+           (pop-bindings))))))
+
+(defn print
+  "Print the xs using PR. *PRINT-READABLY* is dynamically bound to false while
+  printing."
+  [& xs]
+  (binding [*print-readably* false]
+    (apply pr xs)))
+
+(defn println
+  "Same as PRINT but output a trailing newline."
+  [& xs]
+  (binding [*print-readably* false]
+    (apply prn xs)))
+
+;;; 
+;;; NOPE!
+;;; 
+;; (defn repeat
+;;   "Return a lazy (infinite or lengh N) sequence of xs."
+;;   ([x] (lazy-seq (cons x (repeat x))))
+;;   ([n x] (take n (repeat x))))
+
+;; (defn load-file
+;;   [file-name]
+;;   (let [s (fstream "file-name" :in)]
+;;     (binding [*ns* *ns*]
+;;       (let [eoi ()
+;;             x (read s)]
+;;         (when-not (identical? x eoi)
+;;           ((compile x)))))))
+
+(defmacro eval
+  "Compile, evaluate and return the result of form."
+  [form]
+  `((compile ~form)))
+
+(defmacro doc
+  "Print the documentation string for the symbol, if found. Return nil"
+  [sym]
+  `(when-let [m# (meta (var ~sym))]
+     (when-let [p# (:params m#)]
+       (println p#))
+     (when-let [d# (:doc m#)]
+       (println d#))))
+
+(defmacro cond
+  [& clauses]
+  (when clauses
+    (list 'if (first clauses)
+          (if (next clauses)
+            (second clauses)
+            (throw (error SxIllegalArgumentError
+                          "cond requires an even number of args")))
+          (cons 'sexp/cond (nnext clauses)))))
+
+(defn every?
+  [pred coll]
+  (cond
+    (nil? (seq coll)) true
+    (pred (first coll)) (recur pred (next coll))
+    :else false))
+
+(defn map
+  ([f coll]
+   (when-let [s (seq coll)]
+     (cons (f (first s)) (map f (rest s)))))
+  ([f c1 c2]
+   (let [s1 (seq c1) s2 (seq c2)]
+     (when (and s1 s2)
+       (cons (f (first s1) (first s2))
+             (map f (rest s1) (rest s2))))))
+  ([f c1 c2 c3]
+   (let [s1 (seq c1) s2 (seq c2) s3 (seq c3)]
+     (when (and s1 s2 s3)
+       (cons (f (first s1) (first s2) (first s3))
+             (map f (rest s1) (rest s2) (rest s3))))))
+  ([f c1 c2 c3 & colls]
+   (let [step (fn step [cs]
+                (let [ss (map seq cs)]
+                  (when (every? identity ss)
+                    (cons (map first ss) (step (map rest ss))))))]
+     (map #(apply f %) (step (conj colls c3 c2 c1))))))
+
+(defn mapcat
+  [f & colls]
+  (apply concat (apply map f colls)))
+
+(defn filter
+  "Returns a new seq of the items in coll for which (pred item) returns true."
+  [pred coll]
+  (when-let [s (seq coll)]
+    (let [f (first s) r (rest s)]
+      (if (pred f)
+        (cons f (filter pred r))
+        (filter pred r)))))
+
+(defn remove-if
+  [pred coll]
+  (filter (complement pred) coll))
+
+(defn macroexpand
+  "Repeatedly apply MACROEXPAND-1 on form until the form no longer changes.
+  Return that form. This does not expand sub-forms."
+  [form]
+  (let [x (macroexpand-1 form)]
+    (if (identical? x form)
+      form
+      (macroexpand x))))
+
+(defn subvec
+  "Return a vector of the elements in v from start (inclusive) to
+  end (exclusive). If end is omitted, the rest of v is included."
+  ([v start]
+   (subvec v start (count v)))
+  ([v start end]
+   (loop [i start sv []]
+     (if (< i end)
+       (recur (inc i) (conj sv (nth v i)))
+       sv))))
+
+(defmacro ns
+  "Set *ns* to the namespace named by sym, creating it if needed, and refer to
+  all public bindings in the sexp namespace."
+  [sym]
+  (let [sexp# 'sexp]
+    `(do
+       (in-ns '~sym)
+       (refer '~sexp#))))
+
+(defmacro #^{:private true} assert-args
+  [fname & pairs]
+  `(do
+     (when-not ~(first pairs)
+       (throw (error SxError ~(str fname " requires " (second pairs)))))
+     ~(let [more (nnext pairs)]
+        (when more
+          (apply list `assert-args fname more)))))
+
+
+(defn range
+  "Return a sequence of integer from 0 inclusive to n exclusive."
+  [n]
+  (assert-args range (>= n 0) "n to be >= 0")
+  ;; (when (< n 0)
+  ;;   (throw (error 'SxOutOfBoundsError "RANGE argument must be >= 0")))
+  (loop [i 0 v []]
+    (if (< i n)
+      (recur (inc i) (conj v i))
+      (seq v))))
+
+(defmacro doseq
+  "Evaluate body with the symbol in binding bound to successive elements of the
+  seq-able value in bindings. Return nil."
+  [binding & body]
+  `(loop [s# (seq ~(second binding))]
+     (if s#
+       (let [~(first binding) (first s#)]
+         (do ~@body
+             (recur (next s#)))))))
+
+(defmacro with-open
+  "Evaluate body with sym bound to stream. Close the stream before returning
+  the result of body."
+  [sym stream & body]
+  `(let [~sym ~stream]
+     (try
+       ~@body
+       (finally
+         (fclose ~sym)))))
+
+(defn #^{:private true} spread
+  [arglist]
+  (cond
+    (nil? arglist) nil
+    (nil? (next arglist)) (seq (first arglist))
+    :else (cons (first arglist) (spread (next arglist)))))
+
+;;; why not just use: (apply list ...)?
+(defn list*
+  ([args] (seq args))
+  ([a args] (cons a args))
+  ([a b args] (cons a (cons b args)))
+  ([a b c args] (cons a (cons b (cons c args))))
+  ([a b c d & more]
+   (cons a (cons b (cons c (cons d (spread more)))))))
+
+(defn reduce
+  "Apply the binary function f to the first two elements of coll, then apply f
+  to that result and the next element, and so on. If val is supplied it will
+  be considered the first element of coll."
+  ([f coll]
+   ;; (println "reduce" f coll)
+   (let [s (seq coll)]
+     (if s
+       (reduce f (first s) (next s))    ;BOOM! eventually
+       (f))))
+  ([f val coll]
+   ;; (println "reduce" f val coll)
+   (let [s (seq coll)]
+     (if s
+       (recur f (f val (first s)) (next s))
+       val))))
+
+(defn partition
+  ([n coll]
+   (partition n n coll))
+  ([n step coll]
+   (when-let [s (seq coll)]
+     (let [p (take n s)]
+       (when (= n (count p))
+         (cons p (partition n step (drop step s)))))))
+  ([n step pad coll]
+   (when-let [s (seq coll)]
+     (let [p (take n s)]
+       (if (= n (count p))
+         (cons p (partition n step pad (drop step s)))
+         (list (take n (concat p pad))))))))
+
+(defn nthnext
+  "Return the nth next in coll."
+  [coll n]
+  (loop [n n xs (seq coll)]
+    (if (and xs (pos? n))
+      (recur (dec n) (next xs))
+      xs)))
+
+(defn destructure [bindings]
+  (let [bents (partition 2 bindings)
+        msg "unsupported binding form, only :as can follow & parameter"
+        pb (fn pb [bvec b v]
+             (let [pvec
+                   (fn [bvec b val]
+                     (let [gvec (gensym "vec__")]
+                       (loop [ret (-> bvec (conj gvec) (conj val))
+                              n 0
+                              bs b
+                              seen-rest? false]
+                         (if (seq bs)
+                           (let [firstb (first bs)]
+                             (cond
+                               (= firstb '&) (recur (pb ret (second bs)
+                                                        (list `nthnext gvec n))
+                                                    n
+                                                    (nnext bs)
+                                                    true)
+                               (= firstb :as) (pb ret (second bs) gvec)
+                               :else (if seen-rest?
+                                       (throw (error SxError msg))
+                                       (recur (pb ret firstb
+                                                  (list `nth gvec n nil))
+                                              (inc n)
+                                              (next bs)
+                                              seen-rest?))))
+                           ret))))
+                   pmap
+                   (fn [bvec b v]
+                     ;; (println "PMAP1 bvec:" bvec "b:" b "v:" v)
+                     (let [gmap (or (:as b) (gensym "map__"))
+                           defaults (:or b)]
+                       ;; (println "PMAP2 gmap:" gmap "defaults:" defaults)
+                       (loop [ret (-> bvec (conj gmap) (conj v)
+                                      (conj gmap) (conj `(if (seq? ~gmap)
+                                                           (apply hashmap
+                                                                  ~gmap)
+                                                           ~gmap)))
+                              bes (reduce
+                                   (fn [bes entry]
+                                     ;; (println "PMAP3 bes:" bes "entry:" entry)
+                                     (reduce #(assoc %1 %2 ((val entry) %2))
+                                             ;; copy...
+                                             (dissoc (copy bes) (key entry))
+                                             ;; ...so the key is still here
+                                             ((key entry) bes)))
+                                   (dissoc b :as :or)
+                                   {:keys #(keyword (str %)),
+                                    :strs str,
+                                    :syms #(list `quote %)})]
+                         ;; (println "PMAP4 ret:" ret "bes:" bes)
+                         (if (seq bes)
+                           (let [bb (key (first bes))
+                                 bk (val (first bes))
+                                 has-default (contains? defaults bb)]
+                             ;; (println "PMAP5 :bb" bb "bk:" bk "has-default:"
+                             ;;          has-default)
+                             (recur (pb ret bb (if has-default
+                                                 (list `get gmap bk
+                                                       (defaults bb))
+                                                 (list `get gmap bk)))
+                                    (next bes)))
+                           ret))))]
+               (cond
+                 (symbol? b) (-> bvec (conj b) (conj v))
+                 (vector? b) (pvec bvec b v)
+                 (map? b) (pmap bvec b v)
+                 :else (throw (error SxError (str "unsupported binding form: "
+                                                  b))))))
+        process-entry (fn [bvec b] (pb bvec (first b) (second b)))]
+    (if (every? symbol? (map first bents))
+      bindings
+      (reduce process-entry [] bents))))
+
+;;; redefined with destructure-able bindings
+(defmacro let
+  "Evaluate body with bindings valid only within body."
+  [bindings & body]
+  `(let* ~(destructure bindings) ~@body))
+
+(defn partial
+  ([f arg1]
+   (fn [& args] (apply f arg1 args)))
+  ([f arg1 arg2]
+   (fn [& args] (apply f arg1 arg2 args)))
+  ([f arg1 arg2 arg3]
+   (fn [& args] (apply f arg1 arg2 arg3 args)))
+  ([f arg1 arg2 arg3 & more]
+   (fn [& args] (apply f arg1 arg2 arg3 (concat more args)))))
+
+(defn into
+  "Return a new coll consisting of to-call with all of the items of from-coll
+  conjoined."
+  [to from]
+  (reduce conj to from))
+
+(defn read-string
+  "Read and return one object from the string, throwing if EOF is read."
+  [str]
+  (read (sstream str :in)))
+
+(defmacro if-let
+  "If the binding evaluates to true, evaluate and return the then form, else
+  evaluate and return the else form."
+  ([bindings then]
+   `(if-let ~bindings ~then nil))
+  ([bindings then else]
+   (let [form (bindings 0) tst (bindings 1)]
+     `(let [temp# ~tst]
+        (if temp#
+          (let [~form temp#]
+            ~then)
+          ~else)))))
+
